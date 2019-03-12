@@ -180,15 +180,34 @@ public class SolarActivity extends AppCompatActivity {
                         }
                 );
 
-//        CompletableFuture<ViewRenderable> solarControlsStage
-//                =  ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
-//        try {
-//            solarControlsRenderable = solarControlsStage.get();
-//        } catch (ExecutionException e) {
-//            e.printStackTrace();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
+        CompletableFuture<ViewRenderable> solarControlsStage
+                =  ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
+
+        CompletableFuture.allOf(
+                solarControlsStage)
+                .handle(
+                        (notUsed, throwable) -> {
+                            // When you build a Renderable, Sceneform loads its resources in the background while
+                            // returning a CompletableFuture. Call handle(), thenAccept(), or check isDone()
+                            // before calling get().
+
+                            if (throwable != null) {
+                                DemoUtils.displayError(this, "Unable to load renderable", throwable);
+                                return null;
+                            }
+
+                            try {
+                                solarControlsRenderable = solarControlsStage.get();
+
+                                // Everything finished loading successfully.
+                                hasFinishedLoading = true;
+
+                            } catch (InterruptedException | ExecutionException ex) {
+                                DemoUtils.displayError(this, "Unable to load renderable", ex);
+                            }
+
+                            return null;
+                        });
 
     }
 
@@ -205,38 +224,38 @@ public class SolarActivity extends AppCompatActivity {
 
                     TransformableNode mercury = new TransformableNode(arFragment.getTransformationSystem());
                     mercury.setParent(anchorNode);
-//                    mercury.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+                    mercury.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
                     mercury.setRenderable(mercuryRenderable);
                     mercury.select();
 
-//                    Node infoCard = new Node();
-//                    infoCard.setParent(anchorNode);
-//                    infoCard.setRenderable(solarControlsRenderable);
-//                    infoCard.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
-//                    infoCard.setLocalPosition(new Vector3(0.0f, 0.25f, 0.0f));
-//
-//                    View solarControlsView = solarControlsRenderable.getView();
-//
-//                    TextView tv = solarControlsView.findViewById(R.id.tv);
-//                    SeekBar sb = solarControlsView.findViewById(R.id.sb);
-//
-//                    sb.setProgress(1000);
-//                    sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-//                        @Override
-//                        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-//                            tv.setText(progress+"원");
-//                        }
-//
-//                        @Override
-//                        public void onStartTrackingTouch(SeekBar seekBar) {
-//
-//                        }
-//
-//                        @Override
-//                        public void onStopTrackingTouch(SeekBar seekBar) {
-//
-//                        }
-//                    });
+                    Node infoCard = new Node();
+                    infoCard.setParent(anchorNode);
+                    infoCard.setRenderable(solarControlsRenderable);
+                    infoCard.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+                    infoCard.setLocalPosition(new Vector3(0.0f, 1f, 0.0f));
+
+                    View solarControlsView = solarControlsRenderable.getView();
+
+                    TextView tv = solarControlsView.findViewById(R.id.tv);
+                    SeekBar sb = solarControlsView.findViewById(R.id.sb);
+
+                    sb.setProgress(1000);
+                    sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                        @Override
+                        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                            tv.setText(progress+"원");
+                        }
+
+                        @Override
+                        public void onStartTrackingTouch(SeekBar seekBar) {
+
+                        }
+
+                        @Override
+                        public void onStopTrackingTouch(SeekBar seekBar) {
+
+                        }
+                    });
                 })
         );
     }
