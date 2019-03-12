@@ -20,15 +20,15 @@
     android:layout_height="match_parent"
     tools:context=".SolarActivity">
 
-  <!--<com.google.ar.sceneform.ArSceneView-->
-      <!--android:id="@+id/ar_scene_view"-->
-      <!--android:layout_width="fill_parent"-->
-      <!--android:layout_height="fill_parent"-->
-      <!--android:layout_gravity="top"/>-->
+  <com.google.ar.sceneform.ArSceneView
+      android:id="@+id/ar_scene_view"
+      android:layout_width="fill_parent"
+      android:layout_height="fill_parent"
+      android:layout_gravity="top"/>
 
-  <fragment
-      android:id="@+id/ux_fragment"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"/>
+  <!--<fragment-->
+      <!--android:id="@+id/ux_fragment"-->
+      <!--android:layout_width="match_parent"-->
+      <!--android:layout_height="match_parent"/>-->
 
 </RelativeLayout>

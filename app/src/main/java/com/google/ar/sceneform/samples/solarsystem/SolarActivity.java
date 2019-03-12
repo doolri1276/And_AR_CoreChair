@@ -15,17 +15,16 @@
  */
 package com.google.ar.sceneform.samples.solarsystem;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.view.GestureDetector;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -49,14 +48,17 @@ import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.ViewRenderable;
-import com.gun0912.tedpermission.PermissionListener;
-import com.gun0912.tedpermission.TedPermission;
+import com.google.ar.sceneform.ux.ArFragment;
+import com.google.ar.sceneform.ux.BaseTransformableNode;
+import com.google.ar.sceneform.ux.FootprintSelectionVisualizer;
+import com.google.ar.sceneform.ux.SelectionVisualizer;
+import com.google.ar.sceneform.ux.TransformableNode;
+import com.google.ar.sceneform.ux.TransformationSystem;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -74,440 +76,485 @@ public class SolarActivity extends AppCompatActivity {
     ModelRenderable robotRenderable;
 
 
-  private boolean installRequested;
+    private boolean installRequested;
 
-  private GestureDetector gestureDetector;
-  private Snackbar loadingMessageSnackbar = null;
+    private GestureDetector gestureDetector;
+    private Snackbar loadingMessageSnackbar = null;
 
-
-  private ModelRenderable sunRenderable;
-  private ModelRenderable mercuryRenderable;
-  private ModelRenderable venusRenderable;
-  private ModelRenderable earthRenderable;
-  private ModelRenderable lunaRenderable;
-  private ModelRenderable marsRenderable;
-  private ModelRenderable jupiterRenderable;
-  private ModelRenderable saturnRenderable;
-  private ModelRenderable uranusRenderable;
-  private ModelRenderable neptuneRenderable;
-  private ViewRenderable solarControlsRenderable;
-
-  private final SolarSettings solarSettings = new SolarSettings();
-
-  // True once scene is loaded
-  private boolean hasFinishedLoading = false;
-
-  // True once the scene has been placed.
-  private boolean hasPlacedSolarSystem = false;
-
-  // Astronomical units to meters ratio. Used for positioning the planets of the solar system.
-  private static final float AU_TO_METERS = 0.5f;
-
-  @Override
-  @SuppressWarnings({"AndroidApiChecker", "FutureReturnValueIgnored"})
-  // CompletableFuture requires api level 24
-  protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-          setContentView(R.layout.activity_solar);
-
-          //사용가능한 Device인지 먼저 확인
-          checkIsSupportedDeviceOrFinish();
-
-          //arView 셋팅
-    arSceneView = findViewById(R.id.ar_scene_view);
-
-    // Build all the planet models.
-    CompletableFuture<ModelRenderable> sunStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Sol.sfb")).build();
-    CompletableFuture<ModelRenderable> mercuryStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Mercury.sfb")).build();
-    CompletableFuture<ModelRenderable> venusStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Venus.sfb")).build();
-    CompletableFuture<ModelRenderable> earthStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Earth.sfb")).build();
-    CompletableFuture<ModelRenderable> lunaStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Luna.sfb")).build();
-    CompletableFuture<ModelRenderable> marsStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Mars.sfb")).build();
-    CompletableFuture<ModelRenderable> jupiterStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Jupiter.sfb")).build();
-    CompletableFuture<ModelRenderable> saturnStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Saturn.sfb")).build();
-    CompletableFuture<ModelRenderable> uranusStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Uranus.sfb")).build();
-    CompletableFuture<ModelRenderable> neptuneStage =
-        ModelRenderable.builder().setSource(this, Uri.parse("Neptune.sfb")).build();
-
-
-//    solarControlsStage = ViewRenderable.builder()
-//            .setView(getApplicationContext(), R.layout.custom_img_view)
-//            .build()
-//            .thenAccept(renderable -> {
-//              ImageView imgView = (ImageView)renderable.getView();
-//            });
-
-          createRenderables();
-
-    CompletableFuture.allOf(
-            sunStage,
-            mercuryStage,
-            venusStage,
-            earthStage,
-            lunaStage,
-            marsStage,
-            jupiterStage,
-            saturnStage,
-            uranusStage,
-            neptuneStage,
-
-                    solarControlsRenderable)
-        .handle(
-            (notUsed, throwable) -> {
-              // When you build a Renderable, Sceneform loads its resources in the background while
-              // returning a CompletableFuture. Call handle(), thenAccept(), or check isDone()
-              // before calling get().
-
-              if (throwable != null) {
-                DemoUtils.displayError(this, "Unable to load renderable", throwable);
-                return null;
-              }
-
-              try {
-                sunRenderable = sunStage.get();
-                mercuryRenderable = mercuryStage.get();
-                venusRenderable = venusStage.get();
-                earthRenderable = earthStage.get();
-                lunaRenderable = lunaStage.get();
-                marsRenderable = marsStage.get();
-                jupiterRenderable = jupiterStage.get();
-                saturnRenderable = saturnStage.get();
-                uranusRenderable = uranusStage.get();
-                neptuneRenderable = neptuneStage.get();
-                solarControlsRenderable = solarControlsStage.get();
-
-                // Everything finished loading successfully.
-                hasFinishedLoading = true;
-
-              } catch (InterruptedException | ExecutionException ex) {
-                DemoUtils.displayError(this, "Unable to load renderable", ex);
-              }
-
-              return null;
-            });
-
-    // Set up a tap gesture detector.
-    gestureDetector =
-        new GestureDetector(
-            this,
-            new GestureDetector.SimpleOnGestureListener() {
-              @Override
-              public boolean onSingleTapUp(MotionEvent e) {
-                onSingleTap(e);
-                return true;
-              }
-
-              @Override
-              public boolean onDown(MotionEvent e) {
-                return true;
-              }
-            });
-
-    // Set a touch listener on the Scene to listen for taps.
-    arSceneView
-        .getScene()
-        .setOnTouchListener(
-            (HitTestResult hitTestResult, MotionEvent event) -> {
-              // If the solar system hasn't been placed yet, detect a tap and then check to see if
-              // the tap occurred on an ARCore plane to place the solar system.
-              //if (!hasPlacedSolarSystem) {
-                return gestureDetector.onTouchEvent(event);
-             // }
-
-              // Otherwise return false so that the touch event can propagate to the scene.
-              //return false;
-            });
-
-    // Set an update listener on the Scene that will hide the loading message once a Plane is
-    // detected.
-    arSceneView
-        .getScene()
-        .addOnUpdateListener(
-            frameTime -> {
-              if (loadingMessageSnackbar == null) {
-                return;
-              }
-
-              Frame frame = arSceneView.getArFrame();
-              if (frame == null) {
-                return;
-              }
-
-              if (frame.getCamera().getTrackingState() != TrackingState.TRACKING) {
-                return;
-              }
-
-              for (Plane plane : frame.getUpdatedTrackables(Plane.class)) {
-                if (plane.getTrackingState() == TrackingState.TRACKING) {
-                  hideLoadingMessage();
-                }
-              }
-            });
-
-    // Lastly request CAMERA permission which is required by ARCore.
-            DemoUtils.requestCameraPermission(this, Data.RC_PERMISSIONS);
-
-
-//    TedPermission.with(this)
-//            .setPermissionListener(permissionlistener)
-//            .setRationaleMessage("구글 로그인을 하기 위해서는 주소록 접근 권한이 필요해요")
-//            .setDeniedMessage("왜 거부하셨어요...\n하지만 [설정] > [권한] 에서 권한을 허용할 수 있어요.")
-//            .setPermissions(Manifest.permission_group.STORAGE)
-//            .check();
-
-    requestPermission();
+    TransformationSystem transformationSystem;
 
 
 
-      }
+    //Renderable들
+    private ModelRenderable sunRenderable;
+    private ModelRenderable mercuryRenderable;
+    private ModelRenderable venusRenderable;
+    private ModelRenderable earthRenderable;
+    private ModelRenderable lunaRenderable;
+    private ModelRenderable marsRenderable;
+    private ModelRenderable jupiterRenderable;
+    private ModelRenderable saturnRenderable;
+    private ModelRenderable uranusRenderable;
+    private ModelRenderable neptuneRenderable;
+    private ViewRenderable solarControlsRenderable;
 
-      /**
-      * AR 사용가능한 Device인지 확인
-      * */
-      private void checkIsSupportedDeviceOrFinish(){
+    private final SolarSettings solarSettings = new SolarSettings();
 
-          if (!DemoUtils.checkIsSupportedDeviceOrFinish(this)) {
-              // Not a supported device.
-              return;
-          }
-      }
+    // True once scene is loaded
+    private boolean hasFinishedLoading = false;
 
-      /**
-      * ModelRenderable 생성
-      * */
-      private void createRenderables(){
-          //2D 의자
-          solarControlsRenderable = ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
+    // True once the scene has been placed.
+    private boolean hasPlacedSolarSystem = false;
 
-          //3D 로봇
-          ModelRenderable.builder()
-                  .setSource(R.raw.robot)
-                  .build()
-                  .thenAccept(renderable -> robotRenderable = renderable)
-                  .exceptionally(
-                          throwable -> {
-                              Toast toast = Toast.makeText(this, "Robot Renderable을 불러오는데 실패했습니다", Toast.LENGTH_SHORT);
-                              toast.setGravity(Gravity.CENTER, 0, 0);
-                              toast.show();
+    // Astronomical units to meters ratio. Used for positioning the planets of the solar system.
+    private static final float AU_TO_METERS = 0.5f;
+
+    @Override
+    @SuppressWarnings({"AndroidApiChecker", "FutureReturnValueIgnored"})
+    // CompletableFuture requires api level 24
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_solar);
+
+        //사용가능한 Device인지 먼저 확인
+        checkIsSupportedDeviceOrFinish();
+
+        //arView 셋팅
+        arSceneView = findViewById(R.id.ar_scene_view);
+
+        //TransformationSystem
+        transformationSystem = makeTransformationSystem();
+
+        createRenderables();
+
+        setGestureDetector();
+
+        setSceneOnTouchListener();
+        setSceneOnUpdateListener();
+
+        //권한
+        CameraPermissionHelper.requestCameraPermission(this);
+
+    }
+
+    /**
+    * AR 사용가능한 Device인지 확인
+    * */
+    private void checkIsSupportedDeviceOrFinish(){
+
+        if (!DemoUtils.checkIsSupportedDeviceOrFinish(this)) {
+        // Not a supported device.
+        return;
+        }
+    }
+
+    /**
+    * ModelRenderable 생성
+    * */
+    private void createRenderables(){
+
+          // Build all the planet models.
+          CompletableFuture<ModelRenderable> sunStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Sol.sfb")).build();
+          CompletableFuture<ModelRenderable> mercuryStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Mercury.sfb")).build();
+          CompletableFuture<ModelRenderable> venusStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Venus.sfb")).build();
+          CompletableFuture<ModelRenderable> earthStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Earth.sfb")).build();
+          CompletableFuture<ModelRenderable> lunaStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Luna.sfb")).build();
+          CompletableFuture<ModelRenderable> marsStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Mars.sfb")).build();
+          CompletableFuture<ModelRenderable> jupiterStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Jupiter.sfb")).build();
+          CompletableFuture<ModelRenderable> saturnStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Saturn.sfb")).build();
+          CompletableFuture<ModelRenderable> uranusStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Uranus.sfb")).build();
+          CompletableFuture<ModelRenderable> neptuneStage =
+                  ModelRenderable.builder().setSource(this, Uri.parse("Neptune.sfb")).build();
+
+          //2D View
+          CompletableFuture<ViewRenderable> solarControlsStage
+                  =  ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
+
+          CompletableFuture.allOf(
+                  sunStage,
+                  mercuryStage,
+                  venusStage,
+                  earthStage,
+                  lunaStage,
+                  marsStage,
+                  jupiterStage,
+                  saturnStage,
+                  uranusStage,
+                  neptuneStage,
+                  solarControlsStage)
+                  .handle(
+                          (notUsed, throwable) -> {
+                              // When you build a Renderable, Sceneform loads its resources in the background while
+                              // returning a CompletableFuture. Call handle(), thenAccept(), or check isDone()
+                              // before calling get().
+
+                              if (throwable != null) {
+                                  DemoUtils.displayError(this, "Unable to load renderable", throwable);
+                                  return null;
+                              }
+
+                              try {
+                                  sunRenderable = sunStage.get();
+                                  mercuryRenderable = mercuryStage.get();
+                                  venusRenderable = venusStage.get();
+                                  earthRenderable = earthStage.get();
+                                  lunaRenderable = lunaStage.get();
+                                  marsRenderable = marsStage.get();
+                                  jupiterRenderable = jupiterStage.get();
+                                  saturnRenderable = saturnStage.get();
+                                  uranusRenderable = uranusStage.get();
+                                  neptuneRenderable = neptuneStage.get();
+                                  solarControlsRenderable = solarControlsStage.get();
+
+                                  // Everything finished loading successfully.
+                                  hasFinishedLoading = true;
+
+                              } catch (InterruptedException | ExecutionException ex) {
+                                  DemoUtils.displayError(this, "Unable to load renderable", ex);
+                              }
+
                               return null;
-                          }
-                  );
+                          });
 
-  }
-
-  public void requestPermission(){
-   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) { // 마시멜로우 버전과 같거나 이상이라면
-    if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-            || checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-      if(shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-        Toast.makeText(this, "외부 저장소 사용을 위해 읽기/쓰기 필요", Toast.LENGTH_SHORT).show();
-      }
-
-      requestPermissions(new String[]
-                      {Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE},
-              2);  //마지막 인자는 체크해야될 권한 갯수
-
-    } else {
-      Toast.makeText(this, "권한 승인되었음", Toast.LENGTH_SHORT).show();
-    }
-  }
-}
-
-
-
-  @Override
-  protected void onResume() {
-    super.onResume();
-    if (arSceneView == null) {
-      return;
     }
 
-    if (arSceneView.getSession() == null) {
-      // If the session wasn't created yet, don't resume rendering.
-      // This can happen if ARCore needs to be updated or permissions are not granted yet.
-      try {
-        Session session = DemoUtils.createArSession(this, installRequested);
-        if (session == null) {
-          installRequested = DemoUtils.hasCameraPermission(this);
+    /**
+    * GestureDetectore
+    * */
+    private void setGestureDetector(){
+        // Set up a tap gesture detector.
+        gestureDetector =
+                new GestureDetector(
+                        this,
+                        new GestureDetector.SimpleOnGestureListener() {
+                            @Override
+                            public boolean onSingleTapUp(MotionEvent e) {
+                                onSingleTap(e);
+                                return true;
+                            }
+
+                            @Override
+                            public boolean onDown(MotionEvent e) {
+                                return true;
+                            }
+                        });
+    }
+
+    /**
+    * SceneOnTouchListener
+    * */
+    private void setSceneOnTouchListener(){
+        // Set a touch listener on the Scene to listen for taps.
+        arSceneView
+            .getScene()
+            .setOnTouchListener(
+                    (HitTestResult hitTestResult, MotionEvent event) -> {
+                        // If the solar system hasn't been placed yet, detect a tap and then check to see if
+                        // the tap occurred on an ARCore plane to place the solar system.
+                        if (!hasPlacedSolarSystem) {
+                            return gestureDetector.onTouchEvent(event);
+                        }
+
+                        // Otherwise return false so that the touch event can propagate to the scene.
+                        return false;
+                    });
+    }
+
+    /**
+    * SceneOnUpdateListener
+    * */
+
+    private void setSceneOnUpdateListener(){
+        // Set an update listener on the Scene that will hide the loading message once a Plane is
+        // detected.
+        arSceneView
+            .getScene()
+            .addOnUpdateListener(
+                frameTime -> {
+                    if (loadingMessageSnackbar == null) {
+                        return;
+                    }
+
+                    Frame frame = arSceneView.getArFrame();
+                    if (frame == null) {
+                        return;
+                    }
+
+                    if (frame.getCamera().getTrackingState() != TrackingState.TRACKING) {
+                        return;
+                    }
+
+                    for (Plane plane : frame.getUpdatedTrackables(Plane.class)) {
+                        if (plane.getTrackingState() == TrackingState.TRACKING) {
+                            hideLoadingMessage();
+                        }
+                    }
+                });
+    }
+
+
+
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (arSceneView == null) {
           return;
-        } else {
-          arSceneView.setupSession(session);
         }
-      } catch (UnavailableException e) {
-        DemoUtils.handleSessionException(this, e);
-      }
-    }
 
-    try {
-      arSceneView.resume();
-    } catch (CameraNotAvailableException ex) {
-      DemoUtils.displayError(this, "Unable to get camera", ex);
-      finish();
-      return;
-    }
+        if (arSceneView.getSession() == null) {
+            // If the session wasn't created yet, don't resume rendering.
+            // This can happen if ARCore needs to be updated or permissions are not granted yet.
+            try {
+                Session session = DemoUtils.createArSession(this, installRequested);
+                if (session == null) {
+                    installRequested = DemoUtils.hasCameraPermission(this);
+                    return;
+                } else {
+                    arSceneView.setupSession(session);
+                }
+            } catch (UnavailableException e) {
+                DemoUtils.handleSessionException(this, e);
+            }
+        }
 
-    if (arSceneView.getSession() != null) {
-      showLoadingMessage();
-    }
+        try {
+            arSceneView.resume();
+        } catch (CameraNotAvailableException ex) {
+            DemoUtils.displayError(this, "Unable to get camera", ex);
+            finish();
+            return;
+        }
 
-
-  }
-
-  @Override
-  public void onPause() {
-    super.onPause();
-    if (arSceneView != null) {
-      arSceneView.pause();
-    }
-  }
-
-  @Override
-  public void onDestroy() {
-    super.onDestroy();
-    if (arSceneView != null) {
-      arSceneView.destroy();
-    }
-  }
-
-  @Override
-  public void onRequestPermissionsResult(
-      int requestCode, @NonNull String[] permissions, @NonNull int[] results) {
-    if (!DemoUtils.hasCameraPermission(this)) {
-      if (!DemoUtils.shouldShowRequestPermissionRationale(this)) {
-        // Permission denied with checking "Do not ask again".
-        DemoUtils.launchPermissionSettings(this);
-      } else {
-        Toast.makeText(
-                this, "Camera permission is needed to run this application", Toast.LENGTH_LONG)
-            .show();
-      }
-      finish();
-    }
-  }
-
-  @Override
-  public void onWindowFocusChanged(boolean hasFocus) {
-    super.onWindowFocusChanged(hasFocus);
-    if (hasFocus) {
-      // Standard Android full-screen functionality.
-      getWindow()
-          .getDecorView()
-          .setSystemUiVisibility(
-              View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                  | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                  | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                  | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                  | View.SYSTEM_UI_FLAG_FULLSCREEN
-                  | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-      getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    }
-  }
-
-  private void onSingleTap(MotionEvent tap) {
-    if (!hasFinishedLoading) {
-      // We can't do anything yet.
-      return;
-    }
-
-    Frame frame = arSceneView.getArFrame();
-    if (frame != null) {
-      if (tryPlaceSolarSystem(tap, frame)) {
-        hasPlacedSolarSystem = true;
-      }
-    }
-  }
-
-    private static final float INFO_CARD_Y_POS_COEFF = 0.55f;
+        if (arSceneView.getSession() != null) {
+            showLoadingMessage();
+        }
 
 
-  PermissionListener permissionlistener = new PermissionListener() {
-    @Override
-    public void onPermissionGranted() {
-      Toast.makeText(getApplicationContext(), "권한 허가", Toast.LENGTH_SHORT).show();
     }
 
     @Override
-    public void onPermissionDenied(ArrayList<String> deniedPermissions) {
-      Toast.makeText(getApplicationContext(), "권한 거부\n" + deniedPermissions.toString(), Toast.LENGTH_SHORT).show();
-    }
-  };
-
-
-  public Bitmap getBitmapFromURL(String src) {
-    HttpURLConnection connection = null;
-    try {
-      URL url = new URL(src);
-      connection = (HttpURLConnection) url.openConnection();
-      connection.setDoInput(true);
-      connection.connect();
-      InputStream input = connection.getInputStream();
-      Bitmap myBitmap = BitmapFactory.decodeStream(input);
-      return myBitmap;
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    } finally {
-      if (connection != null)
-        connection.disconnect();
-    }
-  }
-
-  private boolean tryPlaceSolarSystem(MotionEvent tap, Frame frame) {
-    if (tap != null && frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
-      for (HitResult hit : frame.hitTest(tap)) {
-        Trackable trackable = hit.getTrackable();
-        if (trackable instanceof Plane && ((Plane) trackable).isPoseInPolygon(hit.getHitPose())) {
-          // Create the Anchor.
-          Anchor anchor = hit.createAnchor();
-          AnchorNode anchorNode = new AnchorNode(anchor);
-          anchorNode.setParent(arSceneView.getScene());
-
-
-            Node infoCard = new Node();
-            //infoCard.setParent(this);
-            infoCard.setEnabled(true);
-            infoCard.setLocalPosition(new Vector3(0.0f, 0.5f  * INFO_CARD_Y_POS_COEFF, 0.0f));
-
-
-          Bitmap bitmap = getBitmapFromURL("http://freepngdownload.com/image/thumb/wooden-chair-png.png");
-
-            ViewRenderable.builder()
-                    .setView(getApplicationContext(), R.layout.solar_controls)
-                    .build()
-                    .thenAccept(
-                            (renderable) -> {
-                                infoCard.setRenderable(renderable);
-
-                                ImageView imgView = (ImageView) renderable.getView();
-                                imgView.setImageBitmap(bitmap);
-
-                                //textView.setText(planetName);
-                            })
-                    .exceptionally(
-                            (throwable) -> {
-                                throw new AssertionError("Could not load plane card view.", throwable);
-                            });
-
-
-
-         // Node solarSystem = createSolarSystem();
-          anchorNode.addChild(infoCard);
-          return true;
+    public void onPause() {
+        super.onPause();
+        if (arSceneView != null) {
+          arSceneView.pause();
         }
-      }
     }
 
-    return false;
-  }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (arSceneView != null) {
+          arSceneView.destroy();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult( int requestCode, @NonNull String[] permissions, @NonNull int[] results) {
+        if (!DemoUtils.hasCameraPermission(this)) {
+            if (!DemoUtils.shouldShowRequestPermissionRationale(this)) {
+                // Permission denied with checking "Do not ask again".
+                DemoUtils.launchPermissionSettings(this);
+            } else {
+                Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show();
+            }
+            finish();
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            // Standard Android full-screen functionality.
+            getWindow()
+                .getDecorView()
+                .setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    /**
+    * 탭 되었을때
+    * */
+    private void onSingleTap(MotionEvent tap) {
+        if (!hasFinishedLoading) {
+            // We can't do anything yet.
+            return;
+        }
+
+        Frame frame = arSceneView.getArFrame();
+        if (frame != null) {
+            if (!hasPlacedSolarSystem && tryPlaceSolarSystem(tap, frame)) {
+                hasPlacedSolarSystem = true;
+            }
+        }
+    }
+
+    /**
+    * 객체 하나 생성
+    * */
+    private boolean tryPlaceSolarSystem(MotionEvent tap, Frame frame) {
+        if (tap != null && frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
+            for (HitResult hit : frame.hitTest(tap)) {
+                Trackable trackable = hit.getTrackable();
+                if (trackable instanceof Plane && ((Plane) trackable).isPoseInPolygon(hit.getHitPose())) {
+                    // Create the Anchor.
+                    Anchor anchor = hit.createAnchor();
+                    AnchorNode anchorNode = new AnchorNode(anchor);
+                    anchorNode.setParent(arSceneView.getScene());
+                    Node chair = createChair();
+                    anchorNode.addChild(chair);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private Node createChair(){
+
+        Node base = new Node();
+
+        Node sun = new Node();
+        sun.setParent(base);
+        sun.setLocalPosition(new Vector3(0.0f, 0.5f, 0.0f));
+
+        Node sunVisual = new Node();
+//        Node sunVisual = new TransformableNode(transformationSystem);
+        sunVisual.setParent(sun);
+
+//        ModelRenderable.builder()
+//                .setSource(this, Uri.parse("Sol.sfb"))
+//                .build()
+//                .thenAccept(renderable -> sunRenderable = renderable)
+//                .exceptionally(
+//                        throwable -> {
+//                            Toast toast =
+//                                    Toast.makeText(this, "Unable to load andy renderable", Toast.LENGTH_LONG);
+//                            toast.setGravity(Gravity.CENTER, 0, 0);
+//                            toast.show();
+//                            return null;
+//                        }
+//                );
+        sunVisual.setRenderable(sunRenderable);
+        sunVisual.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+
+
+        Node infoCard = new Node();
+        infoCard.setParent(sun);
+        infoCard.setRenderable(solarControlsRenderable);
+        infoCard.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+        infoCard.setLocalPosition(new Vector3(0.0f, 0.25f, 0.0f));
+
+        View solarControlsView = solarControlsRenderable.getView();
+
+        TextView tv = solarControlsView.findViewById(R.id.tv);
+        SeekBar sb = solarControlsView.findViewById(R.id.sb);
+
+        sb.setProgress(1000);
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tv.setText(progress+"원");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
+//        sunVisual.setOnTapListener(
+//                ((hitTestResult, motionEvent) -> {
+//                    infoCard.setEnabled(!infoCard.isEnabled());
+//                })
+//        );
+
+
+
+
+        return base;
+    }
+
+    /**
+     * Creates the transformation system used by this fragment. Can be overridden to create a custom
+     * transformation system.
+     */
+    @SuppressWarnings({"AndroidApiChecker", "FutureReturnValueIgnored"})
+    protected TransformationSystem makeTransformationSystem() {
+        FootprintSelectionVisualizer selectionVisualizer = new FootprintSelectionVisualizer();
+
+        TransformationSystem transformationSystem =
+                new TransformationSystem(getResources().getDisplayMetrics(), selectionVisualizer);
+
+       /* ModelRenderable.builder()
+                .setSource(SolarActivity.this, R.raw.sceneform_footprint)
+                .build()
+                .thenAccept(
+                        renderable -> {
+                            // If the selection visualizer already has a footprint renderable, then it was set to
+                            // something custom. Don't override the custom visual.
+                            if (selectionVisualizer.getFootprintRenderable() == null) {
+                                selectionVisualizer.setFootprintRenderable(renderable);
+                            }
+                        })
+                .exceptionally(
+                        throwable -> {
+                            Toast toast =
+                                    Toast.makeText(
+                                            this, "Unable to load footprint renderable", Toast.LENGTH_LONG);
+                            toast.setGravity(Gravity.CENTER, 0, 0);
+                            toast.show();
+                            return null;
+                        });*/
+
+        return transformationSystem;
+    }
+
+
+    public Bitmap getBitmapFromURL(String src) {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(src);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap myBitmap = BitmapFactory.decodeStream(input);
+            return myBitmap;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (connection != null)
+                connection.disconnect();
+        }
+    }
+
+
 
 //  private Node createSolarSystem() {
 //    Node base = new Node();

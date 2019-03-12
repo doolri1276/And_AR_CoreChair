@@ -55,7 +55,6 @@ dependencies {
 apply plugin: 'com.google.ar.sceneform.plugin'
 
 sceneform.asset('sampledata/models/Earth/Earth.gltf',
-sceneform.asset('sampledata/models/andy.obj',
         'default',
         'sampledata/models/Earth/Earth.sfa',
         'src/main/assets/Earth')
@@ -105,5 +104,8 @@ sceneform.asset('sampledata/models/Venus/Venus.gltf',
         'default',
         'sampledata/models/Venus/Venus.sfa',
         'src/main/assets/Venus')
-        'sampledata/models/andy.sfa',
-        'src/main/res/raw/andy')
+
+//sceneform.asset('sampledata/models/Andy/andy.gltf',
+//        'default',
+//        'sampledata/models/Andy/andy.sfa',
+//        'src/main/assets/andy')
