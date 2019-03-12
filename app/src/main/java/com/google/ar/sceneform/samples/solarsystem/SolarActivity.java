@@ -65,13 +65,20 @@ import java.util.concurrent.ExecutionException;
  * ARCore and Sceneform APIs.
  */
 public class SolarActivity extends AppCompatActivity {
-  private static final int RC_PERMISSIONS = 0x123;
+
+    //AR 뷰
+    private ArSceneView arSceneView;
+    private ArFragment arFragment;
+
+    //ModelRenderable
+    ModelRenderable robotRenderable;
+
+
   private boolean installRequested;
 
   private GestureDetector gestureDetector;
   private Snackbar loadingMessageSnackbar = null;
 
-  private ArSceneView arSceneView;
 
   private ModelRenderable sunRenderable;
   private ModelRenderable mercuryRenderable;
@@ -101,13 +108,12 @@ public class SolarActivity extends AppCompatActivity {
   // CompletableFuture requires api level 24
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+          setContentView(R.layout.activity_solar);
 
-    if (!DemoUtils.checkIsSupportedDeviceOrFinish(this)) {
-      // Not a supported device.
-      return;
-    }
+          //사용가능한 Device인지 먼저 확인
+          checkIsSupportedDeviceOrFinish();
 
-    setContentView(R.layout.activity_solar);
+          //arView 셋팅
     arSceneView = findViewById(R.id.ar_scene_view);
 
     // Build all the planet models.
@@ -132,9 +138,6 @@ public class SolarActivity extends AppCompatActivity {
     CompletableFuture<ModelRenderable> neptuneStage =
         ModelRenderable.builder().setSource(this, Uri.parse("Neptune.sfb")).build();
 
-    // Build a renderable from a 2D View.
-    CompletableFuture<ViewRenderable> solarControlsStage =
-        ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
 
 //    solarControlsStage = ViewRenderable.builder()
 //            .setView(getApplicationContext(), R.layout.custom_img_view)
@@ -143,6 +146,7 @@ public class SolarActivity extends AppCompatActivity {
 //              ImageView imgView = (ImageView)renderable.getView();
 //            });
 
+          createRenderables();
 
     CompletableFuture.allOf(
             sunStage,
@@ -155,7 +159,8 @@ public class SolarActivity extends AppCompatActivity {
             saturnStage,
             uranusStage,
             neptuneStage,
-            solarControlsStage)
+
+                    solarControlsRenderable)
         .handle(
             (notUsed, throwable) -> {
               // When you build a Renderable, Sceneform loads its resources in the background while
@@ -249,7 +254,7 @@ public class SolarActivity extends AppCompatActivity {
             });
 
     // Lastly request CAMERA permission which is required by ARCore.
-    DemoUtils.requestCameraPermission(this, RC_PERMISSIONS);
+            DemoUtils.requestCameraPermission(this, Data.RC_PERMISSIONS);
 
 
 //    TedPermission.with(this)
@@ -260,6 +265,42 @@ public class SolarActivity extends AppCompatActivity {
 //            .check();
 
     requestPermission();
+
+
+
+      }
+
+      /**
+      * AR 사용가능한 Device인지 확인
+      * */
+      private void checkIsSupportedDeviceOrFinish(){
+
+          if (!DemoUtils.checkIsSupportedDeviceOrFinish(this)) {
+              // Not a supported device.
+              return;
+          }
+      }
+
+      /**
+      * ModelRenderable 생성
+      * */
+      private void createRenderables(){
+          //2D 의자
+          solarControlsRenderable = ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
+
+          //3D 로봇
+          ModelRenderable.builder()
+                  .setSource(R.raw.robot)
+                  .build()
+                  .thenAccept(renderable -> robotRenderable = renderable)
+                  .exceptionally(
+                          throwable -> {
+                              Toast toast = Toast.makeText(this, "Robot Renderable을 불러오는데 실패했습니다", Toast.LENGTH_SHORT);
+                              toast.setGravity(Gravity.CENTER, 0, 0);
+                              toast.show();
+                              return null;
+                          }
+                  );
 
   }
 
@@ -317,6 +358,8 @@ public class SolarActivity extends AppCompatActivity {
     if (arSceneView.getSession() != null) {
       showLoadingMessage();
     }
+
+
   }
 
   @Override
