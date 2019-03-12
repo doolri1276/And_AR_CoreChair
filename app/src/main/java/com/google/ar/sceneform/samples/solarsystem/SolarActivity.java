@@ -76,6 +76,10 @@ public class SolarActivity extends AppCompatActivity {
     ModelRenderable robotRenderable;
 
 
+    //데이터들
+    boolean isArFragmentMode = true;
+
+
     private boolean installRequested;
 
     private GestureDetector gestureDetector;
@@ -119,18 +123,28 @@ public class SolarActivity extends AppCompatActivity {
         //사용가능한 Device인지 먼저 확인
         checkIsSupportedDeviceOrFinish();
 
-        //arView 셋팅
-        arSceneView = findViewById(R.id.ar_scene_view);
+        if(isArFragmentMode){
+            arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.ux_fragment);
 
-        //TransformationSystem
-        transformationSystem = makeTransformationSystem();
+            createModelRenderable();
 
-        createRenderables();
+            setOnTapArPlaneListener();
+        }else{
+            //arView 셋팅
+//            arSceneView = findViewById(R.id.ar_scene_view);
 
-        setGestureDetector();
+            //TransformationSystem
+            transformationSystem = makeTransformationSystem();
 
-        setSceneOnTouchListener();
-        setSceneOnUpdateListener();
+            createRenderables();
+
+            setGestureDetector();
+
+            setSceneOnTouchListener();
+            setSceneOnUpdateListener();
+
+        }
+
 
         //권한
         CameraPermissionHelper.requestCameraPermission(this);
@@ -146,6 +160,85 @@ public class SolarActivity extends AppCompatActivity {
         // Not a supported device.
         return;
         }
+    }
+
+    /**
+    * arFragment있을때
+    * */
+    private void createModelRenderable(){
+        ModelRenderable.builder()
+                .setSource(this, Uri.parse("Mercury.sfb"))
+                .build()
+                .thenAccept(renderable -> mercuryRenderable = renderable)
+                .exceptionally(
+                        throwable -> {
+                            Toast toast =
+                                    Toast.makeText(this, "Unable to load andy renderable", Toast.LENGTH_LONG);
+                            toast.setGravity(Gravity.CENTER, 0, 0);
+                            toast.show();
+                            return null;
+                        }
+                );
+
+//        CompletableFuture<ViewRenderable> solarControlsStage
+//                =  ViewRenderable.builder().setView(this, R.layout.solar_controls).build();
+//        try {
+//            solarControlsRenderable = solarControlsStage.get();
+//        } catch (ExecutionException e) {
+//            e.printStackTrace();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+
+    }
+
+    private void setOnTapArPlaneListener(){
+        arFragment.setOnTapArPlaneListener(
+                ((hitResult, plane, motionEvent) -> {
+                    if(mercuryRenderable==null){
+                        return;
+                    }
+
+                    Anchor anchor = hitResult.createAnchor();
+                    AnchorNode anchorNode = new AnchorNode(anchor);
+                    anchorNode.setParent(arFragment.getArSceneView().getScene());
+
+                    TransformableNode mercury = new TransformableNode(arFragment.getTransformationSystem());
+                    mercury.setParent(anchorNode);
+//                    mercury.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+                    mercury.setRenderable(mercuryRenderable);
+                    mercury.select();
+
+//                    Node infoCard = new Node();
+//                    infoCard.setParent(anchorNode);
+//                    infoCard.setRenderable(solarControlsRenderable);
+//                    infoCard.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
+//                    infoCard.setLocalPosition(new Vector3(0.0f, 0.25f, 0.0f));
+//
+//                    View solarControlsView = solarControlsRenderable.getView();
+//
+//                    TextView tv = solarControlsView.findViewById(R.id.tv);
+//                    SeekBar sb = solarControlsView.findViewById(R.id.sb);
+//
+//                    sb.setProgress(1000);
+//                    sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+//                        @Override
+//                        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+//                            tv.setText(progress+"원");
+//                        }
+//
+//                        @Override
+//                        public void onStartTrackingTouch(SeekBar seekBar) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onStopTrackingTouch(SeekBar seekBar) {
+//
+//                        }
+//                    });
+                })
+        );
     }
 
     /**
