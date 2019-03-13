@@ -15,14 +15,24 @@
  */
 package com.google.ar.sceneform.samples.solarsystem;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
+import android.media.Image;
+import android.media.ImageReader;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
+import android.util.Log;
+import android.util.Size;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -37,6 +47,7 @@ import com.google.ar.core.Frame;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.core.Session;
+import com.google.ar.core.SharedCamera;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
@@ -59,14 +70,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
  * ARCore and Sceneform APIs.
  */
-public class SolarActivity extends AppCompatActivity {
+public class SolarActivity extends AppCompatActivity implements ImageReader.OnImageAvailableListener{
+
+    private final String TAG = SolarActivity.class.getSimpleName();
 
     //AR 뷰
     private ArSceneView arSceneView;
@@ -74,6 +89,18 @@ public class SolarActivity extends AppCompatActivity {
 
     //ModelRenderable
     ModelRenderable robotRenderable;
+
+    //카메라
+    SharedCamera sharedCamera;                      // ARCore shared camera instance, obtained from ARCore session that supports sharing.
+    private String cameraId;                        // Camera ID for the camera used by ARCore.
+    private ImageReader cpuImageReader;             // Image reader that continuously processes CPU images.
+    private Handler backgroundHandler;              // Looper handler.
+    private HandlerThread backgroundThread;         // Looper handler thread.
+    private int cpuImagesProcessed;                 // Total number of CPU images processed.
+    private CameraDevice cameraDevice;              // Camera device. Used by both non-AR and AR modes;
+
+    //카메라 테스트용
+    private final AtomicBoolean automatorRun = new AtomicBoolean(false);
 
 
     //데이터들
@@ -86,6 +113,33 @@ public class SolarActivity extends AppCompatActivity {
     private Snackbar loadingMessageSnackbar = null;
 
     TransformationSystem transformationSystem;
+
+    //쇼핑카트
+    ImageView ivCart;
+
+
+
+
+    //Camera device state callback.
+    private final CameraDevice.StateCallback cameraDeviceCallback =
+            new CameraDevice.StateCallback() {
+                @Override
+                public void onOpened(@NonNull CameraDevice camera) {
+                    Log.d(TAG, "Camera device ID ["+ camera.getId()+"] opened.");
+                    cameraDevice = camera;
+//                    createCameraPreviewSession();
+                }
+
+                @Override
+                public void onDisconnected(@NonNull CameraDevice camera) {
+
+                }
+
+                @Override
+                public void onError(@NonNull CameraDevice camera, int error) {
+
+                }
+            };
 
 
 
@@ -123,12 +177,24 @@ public class SolarActivity extends AppCompatActivity {
         //사용가능한 Device인지 먼저 확인
         checkIsSupportedDeviceOrFinish();
 
+        //권한
+        CameraPermissionHelper.requestCameraPermission(this);
+
+        ivCart = findViewById(R.id.iv_cart);
+
+        ivCart.setOnClickListener(v -> {
+            Intent intent = new Intent(SolarActivity.this, MainActivity.class);
+            startActivity(intent);
+        });
+
         if(isArFragmentMode){
             arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.ux_fragment);
 
             createModelRenderable();
 
             setOnTapArPlaneListener();
+
+
         }else{
             //arView 셋팅
 //            arSceneView = findViewById(R.id.ar_scene_view);
@@ -145,9 +211,6 @@ public class SolarActivity extends AppCompatActivity {
 
         }
 
-
-        //권한
-        CameraPermissionHelper.requestCameraPermission(this);
 
     }
 
@@ -258,6 +321,54 @@ public class SolarActivity extends AppCompatActivity {
 //                    });
                 })
         );
+    }
+
+    private void openCameraForSharing(){
+
+        Session sharedSession = arFragment.getArSceneView().getSession();
+
+        sharedCamera = sharedSession.getSharedCamera();
+
+        cameraId = sharedSession.getCameraConfig().getCameraId();
+
+        Size desiredCpuImageSize = sharedSession.getCameraConfig().getImageSize();
+        cpuImageReader = ImageReader.newInstance(
+                desiredCpuImageSize.getWidth(),
+                desiredCpuImageSize.getHeight(),
+                ImageFormat.YUV_420_888,
+                2
+        );
+        cpuImageReader.setOnImageAvailableListener(this, backgroundHandler);
+
+        sharedCamera.setAppSurfaces(cameraId, Arrays.asList(cpuImageReader.getSurface()));
+
+//        try{
+//            CameraDevice.StateCallback wrappedCallback =
+//                    sharedCamera.createARDeviceStateCallback(camera);
+//        }
+
+    }
+
+    /**
+    * backgroundHandler관리
+    * */
+    private void startBackgroundThread(){
+        backgroundThread = new HandlerThread(Data.NAME_BACKGROUND_HANDLER);
+        backgroundThread.start();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    private void stopBackgroundThread(){
+        if(backgroundThread != null) {
+            backgroundThread.quitSafely();
+            try{
+                backgroundThread.join();
+                backgroundThread = null;
+                backgroundHandler = null;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -452,6 +563,10 @@ public class SolarActivity extends AppCompatActivity {
             showLoadingMessage();
         }
 
+        startBackgroundThread();
+
+        openCameraForSharing();
+
 
     }
 
@@ -461,6 +576,8 @@ public class SolarActivity extends AppCompatActivity {
         if (arSceneView != null) {
           arSceneView.pause();
         }
+
+        stopBackgroundThread();
     }
 
     @Override
@@ -609,6 +726,36 @@ public class SolarActivity extends AppCompatActivity {
 
 
         return base;
+    }
+
+    /**
+     * ImageReader.OnImageAvailableListener 상속받은거
+     * */
+    @Override
+    public void onImageAvailable(ImageReader reader) {
+        Image image = reader.acquireLatestImage();
+        if(image == null) {
+            Log.w(TAG, "onImageAvailable: Skipping null Image.");
+            return;
+        }
+
+        image.close();
+        cpuImagesProcessed++;
+
+        // Reduce the screen update to once every two seconds with 30fps if running as automated test.
+//        if (!automatorRun.get() || (automatorRun.get() && cpuImagesProcessed % 50 == 0)) {
+//            runOnUiThread(
+//                    () ->
+//                            statusTextView.setText(
+//                                    "CPU images processed: "
+//                                            + cpuImagesProcessed
+//                                            + "\n\nMode: "
+//                                            + (arMode ? "AR" : "non-AR")
+//                                            + " \nARCore active: "
+//                                            + arcoreActive
+//                                            + " \nShould update surface texture: "
+//                                            + shouldUpdateSurfaceTexture.get()));
+//        }
     }
 
     /**
@@ -794,4 +941,6 @@ public class SolarActivity extends AppCompatActivity {
     loadingMessageSnackbar.dismiss();
     loadingMessageSnackbar = null;
   }
+
+
 }

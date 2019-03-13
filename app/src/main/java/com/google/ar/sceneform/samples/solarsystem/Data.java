@@ -14,4 +14,9 @@ public class Data {
      * 최소 버전
      * */
     public static final double MIN_OPENGL_VERSION = 3.0;
+
+    /**
+    * 핸들러 이름
+    * */
+    public static final String NAME_BACKGROUND_HANDLER = "sharedCameraBackground";
 }
