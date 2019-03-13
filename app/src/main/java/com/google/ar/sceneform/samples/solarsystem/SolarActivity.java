@@ -231,31 +231,31 @@ public class SolarActivity extends AppCompatActivity {
                     Node infoCard = new Node();
                     infoCard.setParent(anchorNode);
                     infoCard.setRenderable(solarControlsRenderable);
-                    infoCard.setLocalScale(new Vector3(0.5f, 0.5f, 0.5f));
-                    infoCard.setLocalPosition(new Vector3(0.0f, 1f, 0.0f));
+                    infoCard.setLocalScale(new Vector3(0.7f, 0.7f, 0.7f));
+                    infoCard.setLocalPosition(new Vector3(0.0f, 0.6f, 0.0f));
 
                     View solarControlsView = solarControlsRenderable.getView();
 
                     TextView tv = solarControlsView.findViewById(R.id.tv);
-                    SeekBar sb = solarControlsView.findViewById(R.id.sb);
-
-                    sb.setProgress(1000);
-                    sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                        @Override
-                        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                            tv.setText(progress+"원");
-                        }
-
-                        @Override
-                        public void onStartTrackingTouch(SeekBar seekBar) {
-
-                        }
-
-                        @Override
-                        public void onStopTrackingTouch(SeekBar seekBar) {
-
-                        }
-                    });
+//                    SeekBar sb = solarControlsView.findViewById(R.id.sb);
+//
+//                    sb.setProgress(1000);
+//                    sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+//                        @Override
+//                        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+//                            tv.setText(progress+"원");
+//                        }
+//
+//                        @Override
+//                        public void onStartTrackingTouch(SeekBar seekBar) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onStopTrackingTouch(SeekBar seekBar) {
+//
+//                        }
+//                    });
                 })
         );
     }
